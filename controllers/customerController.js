@@ -1,6 +1,7 @@
 const Customer = require("../models/Customer");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const ServicePrice = require("../models/ServicePrice");
 
 // Register Customer
 
@@ -101,30 +102,104 @@ const loginCustomer = async (req, res) => {
 };
 // Get All Technicians
 
-const Technician = require("../models/Technician");
-
 const getAllTechnicians = async (req, res) => {
 
-    try {
+  try {
 
-        const technicians = await Technician.find(
-            {},
-            "-password -_id -__v"
-        );
+    const { appliance, problem } = req.query;
 
-        res.status(200).json(technicians);
+    let serviceName = "";
+
+    switch (appliance) {
+
+      case "AC":
+        serviceName = "AC Repair";
+        break;
+
+      case "Refrigerator":
+        serviceName = "Refrigerator Repair";
+        break;
+
+      case "Washing Machine":
+        serviceName = "Washing Machine Repair";
+        break;
+
+      case "Cooler":
+        serviceName = "Cooler Repair";
+        break;
+
+      case "TV Repair":
+        serviceName = "TV Repair";
+        break;
+
+      case "Electrician":
+        serviceName = "Electrician";
+        break;
+
+      default:
+        serviceName = appliance;
 
     }
 
-    catch (error) {
+    const technicians = await Technician.find({
 
-        res.status(500).json({
+      service: serviceName
 
-            message: error.message
+    }).select("-password -__v");
 
-        });
+    const result = [];
+
+    for (const tech of technicians) {
+
+      const servicePrice = await ServicePrice.findOne({
+
+        technicianId: tech._id,
+
+        appliance,
+
+        problem
+
+      });
+
+      result.push({
+
+        _id: tech._id,
+
+        name: tech.name,
+
+        email: tech.email,
+
+        phone: tech.phone,
+
+        city: tech.city,
+
+        experience: tech.experience,
+
+        service: tech.service,
+
+        address: tech.address,
+
+        price: servicePrice
+          ? servicePrice.price
+          : "Not Available"
+
+      });
 
     }
+
+    res.status(200).json(result);
+
+  }
+
+  catch (error) {
+
+    res.status(500).json({
+
+      message: error.message
+
+    });
+
+  }
 
 };
 
