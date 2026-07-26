@@ -4,7 +4,9 @@ const router = express.Router();
 
 const {
     registerTechnician,
-    loginTechnician
+    loginTechnician,
+    getTechnicianProfile,
+    updateTechnicianProfile
 } = require("../controllers/technicianController");
 
 router.post(
@@ -15,6 +17,16 @@ router.post(
 router.post(
     "/login",
     loginTechnician
+);
+
+router.get(
+    "/profile/:id",
+    getTechnicianProfile
+);
+
+router.put(
+    "/profile/:id",
+    updateTechnicianProfile
 );
 
 module.exports = router;

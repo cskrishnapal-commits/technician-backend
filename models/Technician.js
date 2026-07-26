@@ -7,7 +7,8 @@ const technicianSchema = new mongoose.Schema({
     password: String,
     service: String,
     experience: String,
-    city: String
+    city: String,
+    address:String
 });
 
 module.exports = mongoose.model(

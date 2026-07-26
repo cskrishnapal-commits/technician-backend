@@ -114,8 +114,107 @@ const loginTechnician = async (req, res) => {
     }
 
 };
+// Get Technician Profile
+
+const getTechnicianProfile = async (req, res) => {
+
+    try {
+
+        const technician = await Technician.findById(
+            req.params.id
+        );
+
+        if (!technician) {
+
+            return res.status(404).json({
+                message: "Technician not found"
+            });
+
+        }
+
+        res.status(200).json(technician);
+
+    }
+
+    catch (error) {
+
+        res.status(500).json({
+            message: error.message
+        });
+
+    }
+
+};
+// Update Technician Profile
+
+const updateTechnicianProfile = async (req, res) => {
+
+    try {
+
+        const {
+            name,
+            phone,
+            city,
+            experience,
+            service,
+            address
+        } = req.body;
+
+        const updatedTechnician =
+            await Technician.findByIdAndUpdate(
+
+                req.params.id,
+
+                {
+                    name,
+                    phone,
+                    city,
+                    experience,
+                    service,
+                    address
+                },
+
+                {
+                    new: true
+                }
+
+            );
+
+        if (!updatedTechnician) {
+
+            return res.status(404).json({
+
+                message: "Technician not found"
+
+            });
+
+        }
+
+        res.status(200).json({
+
+            message: "Profile Updated Successfully",
+
+            technician: updatedTechnician
+
+        });
+
+    }
+
+    catch (error) {
+
+        res.status(500).json({
+
+            message: error.message
+
+        });
+
+    }
+
+};
 
 module.exports = {
     registerTechnician,
-    loginTechnician
+    loginTechnician,
+    getTechnicianProfile,
+    updateTechnicianProfile
 };
