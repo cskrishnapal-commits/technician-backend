@@ -203,43 +203,25 @@ const getAllTechnicians = async (req, res) => {
 
 };
 // Get Customer Profile
-
 const getCustomerProfile = async (req, res) => {
 
-  try {
+    try {
 
-    const customer = await Customer.findById(
+        const customer = await Customer.findById(req.params.id).select("-password");
 
-      req.params.id
-
-    ).select("-password -__v");
-
-    if (!customer) {
-
-      return res.status(404).json({
-
-        message: "Customer not found"
-
-      });
+        res.status(200).json(customer);
 
     }
 
-    res.status(200).json(customer);
+    catch (error) {
 
-  }
+        res.status(500).json({
+            message: error.message
+        });
 
-  catch (error) {
-
-    res.status(500).json({
-
-      message: error.message
-
-    });
-
-  }
+    }
 
 };
-// Update Customer Profile
 
 const updateCustomerProfile = async (req, res) => {
 
@@ -248,54 +230,34 @@ const updateCustomerProfile = async (req, res) => {
         const {
 
             name,
-
             phone,
-
             city,
-
             address
 
         } = req.body;
 
-        const updatedCustomer = await Customer.findByIdAndUpdate(
+        const customer = await Customer.findById(req.params.id);
 
-            req.params.id,
-
-            {
-
-                name,
-
-                phone,
-
-                city,
-
-                address
-
-            },
-
-            {
-
-                new: true
-
-            }
-
-        ).select("-password -__v");
-
-        if (!updatedCustomer) {
+        if (!customer) {
 
             return res.status(404).json({
-
                 message: "Customer not found"
-
             });
 
         }
+
+        customer.name = name;
+        customer.phone = phone;
+        customer.city = city;
+        customer.address = address;
+
+        await customer.save();
 
         res.status(200).json({
 
             message: "Profile Updated Successfully",
 
-            customer: updatedCustomer
+            customer
 
         });
 
