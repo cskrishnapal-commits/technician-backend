@@ -2,7 +2,7 @@ const Customer = require("../models/Customer");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const ServicePrice = require("../models/ServicePrice");
-
+const Technician = require("../models/Technician");
 // Register Customer
 
 const registerCustomer = async (req, res) => {
