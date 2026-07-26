@@ -99,8 +99,37 @@ const loginCustomer = async (req, res) => {
   }
 
 };
+// Get All Technicians
+
+const Technician = require("../models/Technician");
+
+const getAllTechnicians = async (req, res) => {
+
+    try {
+
+        const technicians = await Technician.find(
+            {},
+            "-password","-_id"
+        );
+
+        res.status(200).json(technicians);
+
+    }
+
+    catch (error) {
+
+        res.status(500).json({
+
+            message: error.message
+
+        });
+
+    }
+
+};
 
 module.exports = {
   registerCustomer,
-  loginCustomer
+  loginCustomer,
+  getAllTechnicians
 };
