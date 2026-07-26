@@ -202,9 +202,122 @@ const getAllTechnicians = async (req, res) => {
   }
 
 };
+// Get Customer Profile
+
+const getCustomerProfile = async (req, res) => {
+
+  try {
+
+    const customer = await Customer.findById(
+
+      req.params.id
+
+    ).select("-password -__v");
+
+    if (!customer) {
+
+      return res.status(404).json({
+
+        message: "Customer not found"
+
+      });
+
+    }
+
+    res.status(200).json(customer);
+
+  }
+
+  catch (error) {
+
+    res.status(500).json({
+
+      message: error.message
+
+    });
+
+  }
+
+};
+// Update Customer Profile
+
+const updateCustomerProfile = async (req, res) => {
+
+    try {
+
+        const {
+
+            name,
+
+            phone,
+
+            city,
+
+            address
+
+        } = req.body;
+
+        const updatedCustomer = await Customer.findByIdAndUpdate(
+
+            req.params.id,
+
+            {
+
+                name,
+
+                phone,
+
+                city,
+
+                address
+
+            },
+
+            {
+
+                new: true
+
+            }
+
+        ).select("-password -__v");
+
+        if (!updatedCustomer) {
+
+            return res.status(404).json({
+
+                message: "Customer not found"
+
+            });
+
+        }
+
+        res.status(200).json({
+
+            message: "Profile Updated Successfully",
+
+            customer: updatedCustomer
+
+        });
+
+    }
+
+    catch (error) {
+
+        res.status(500).json({
+
+            message: error.message
+
+        });
+
+    }
+
+};
 
 module.exports = {
   registerCustomer,
   loginCustomer,
-  getAllTechnicians
+  getAllTechnicians,
+  getCustomerProfile,
+  updateCustomerProfile
+
 };
