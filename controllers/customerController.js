@@ -109,7 +109,7 @@ const getAllTechnicians = async (req, res) => {
 
         const technicians = await Technician.find(
             {},
-            "-password","-_id"
+            "-password -_id -__v"
         );
 
         res.status(200).json(technicians);
