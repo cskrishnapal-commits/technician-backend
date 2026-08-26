@@ -4,15 +4,175 @@ const jwt = require("jsonwebtoken");
 const axios = require("axios");
 
 
-// ==========================================
+// ======================================================
+// HELPER: FORWARD GEOCODING
+// ADDRESS -> LATITUDE / LONGITUDE
+// ======================================================
+
+const geocodeAddress = async (address, city) => {
+
+    if (!address || !address.trim()) {
+
+        throw new Error(
+            "Please provide a service address."
+        );
+
+    }
+
+
+    const cleanAddress =
+        address.trim();
+
+    const cleanCity =
+        city?.trim() || "";
+
+
+    // Multiple search formats
+    // First one succeeds -> return coordinates
+
+    const searchQueries = [
+
+        cleanCity
+            ? `${cleanAddress}, ${cleanCity}, Maharashtra, India`
+            : `${cleanAddress}, Maharashtra, India`,
+
+        cleanCity
+            ? `${cleanAddress}, ${cleanCity}, India`
+            : `${cleanAddress}, India`,
+
+        `${cleanAddress}, India`
+
+    ];
+
+
+    for (const searchAddress of searchQueries) {
+
+        try {
+
+            console.log(
+                "Geocoding:",
+                searchAddress
+            );
+
+
+            const response =
+                await axios.get(
+
+                    "https://nominatim.openstreetmap.org/search",
+
+                    {
+
+                        params: {
+
+                            q:
+                                searchAddress,
+
+                            format:
+                                "jsonv2",
+
+                            addressdetails:
+                                1,
+
+                            limit:
+                                5,
+
+                            countrycodes:
+                                "in"
+
+                        },
+
+                        headers: {
+
+                            "User-Agent":
+                                "TechnicianWebApp/1.0"
+
+                        },
+
+                        timeout:
+                            10000
+
+                    }
+
+                );
+
+
+            if (
+                response.data &&
+                response.data.length > 0
+            ) {
+
+                for (
+                    const result
+                    of response.data
+                ) {
+
+                    const latitude =
+                        Number(result.lat);
+
+                    const longitude =
+                        Number(result.lon);
+
+
+                    if (
+
+                        Number.isFinite(
+                            latitude
+                        ) &&
+
+                        Number.isFinite(
+                            longitude
+                        )
+
+                    ) {
+
+                        return {
+
+                            latitude,
+
+                            longitude
+
+                        };
+
+                    }
+
+                }
+
+            }
+
+        }
+
+        catch (error) {
+
+            console.log(
+                "Geocoding attempt failed:",
+                error.message
+            );
+
+        }
+
+    }
+
+
+    throw new Error(
+
+        "Address location could not be found. Please enter a more complete address."
+
+    );
+
+};
+
+
+
+// ======================================================
 // REGISTER TECHNICIAN
-// ==========================================
+// ======================================================
 
 const registerTechnician = async (req, res) => {
 
     try {
 
         const {
+
             name,
             email,
             phone,
@@ -24,20 +184,23 @@ const registerTechnician = async (req, res) => {
             address,
             latitude,
             longitude
+
         } = req.body;
 
 
-        // ==========================================
-        // CHECK REQUIRED FIELDS
-        // ==========================================
+        // ==================================================
+        // REQUIRED FIELDS
+        // ==================================================
 
         if (
+
             !name ||
             !email ||
             !phone ||
             !password ||
             !service ||
             !address
+
         ) {
 
             return res.status(400).json({
@@ -50,12 +213,14 @@ const registerTechnician = async (req, res) => {
         }
 
 
-        // ==========================================
-        // CHECK EXISTING TECHNICIAN
-        // ==========================================
+        // ==================================================
+        // CHECK EXISTING EMAIL
+        // ==================================================
 
         const existingTechnician =
-            await Technician.findOne({ email });
+            await Technician.findOne({
+                email
+            });
 
 
         if (existingTechnician) {
@@ -70,21 +235,20 @@ const registerTechnician = async (req, res) => {
         }
 
 
-        // ==========================================
+        // ==================================================
         // HASH PASSWORD
-        // ==========================================
+        // ==================================================
 
         const hashedPassword =
-            await bcrypt.hash(password, 10);
+            await bcrypt.hash(
+                password,
+                10
+            );
 
 
-        // ==========================================
+        // ==================================================
         // LOCATION
-        // ==========================================
-
-        let finalLatitude = null;
-        let finalLongitude = null;
-
+        // ==================================================
 
         const lat =
             Number(latitude);
@@ -94,15 +258,20 @@ const registerTechnician = async (req, res) => {
 
 
         const validGPSLocation =
+
             Number.isFinite(lat) &&
             Number.isFinite(lng) &&
             lat !== 0 &&
             lng !== 0;
 
 
-        // ==========================================
-        // CASE 1: GPS LOCATION PROVIDED
-        // ==========================================
+        let finalLatitude;
+        let finalLongitude;
+
+
+        // ==================================================
+        // GPS LOCATION
+        // ==================================================
 
         if (validGPSLocation) {
 
@@ -115,118 +284,35 @@ const registerTechnician = async (req, res) => {
         }
 
 
-        // ==========================================
-        // CASE 2: MANUAL ADDRESS
-        // FORWARD GEOCODING
-        // ==========================================
+        // ==================================================
+        // MANUAL ADDRESS
+        // ==================================================
 
         else {
 
             try {
 
-                const searchAddress =
-                    city && city.trim() !== ""
-                        ? `${address}, ${city}, India`
-                        : `${address}, India`;
-
-
-                const response =
-                    await axios.get(
-
-                        "https://nominatim.openstreetmap.org/search",
-
-                        {
-
-                            params: {
-
-                                q:
-                                    searchAddress,
-
-                                format:
-                                    "json",
-
-                                limit:
-                                    1,
-
-                                countrycodes:
-                                    "in"
-
-                            },
-
-                            headers: {
-
-                                "User-Agent":
-                                    "TechnicianWebApp/1.0"
-
-                            },
-
-                            timeout:
-                                10000
-
-                        }
-
+                const coordinates =
+                    await geocodeAddress(
+                        address,
+                        city
                     );
-
-
-                if (
-                    !response.data ||
-                    response.data.length === 0
-                ) {
-
-                    return res.status(400).json({
-
-                        message:
-                            "Unable to find this address. Please enter a more complete address."
-
-                    });
-
-                }
 
 
                 finalLatitude =
-                    Number(
-                        response.data[0].lat
-                    );
-
+                    coordinates.latitude;
 
                 finalLongitude =
-                    Number(
-                        response.data[0].lon
-                    );
-
-
-                if (
-                    !Number.isFinite(
-                        finalLatitude
-                    ) ||
-                    !Number.isFinite(
-                        finalLongitude
-                    )
-                ) {
-
-                    return res.status(400).json({
-
-                        message:
-                            "Unable to get coordinates for this address."
-
-                    });
-
-                }
+                    coordinates.longitude;
 
             }
 
-            catch (geocodeError) {
+            catch (error) {
 
-                console.log(
-                    "Registration Forward Geocoding Error:",
-                    geocodeError.message
-                );
-
-
-                return res.status(500).json({
+                return res.status(400).json({
 
                     message:
-                        "Unable to convert address into location."
+                        error.message
 
                 });
 
@@ -235,9 +321,9 @@ const registerTechnician = async (req, res) => {
         }
 
 
-        // ==========================================
+        // ==================================================
         // CREATE TECHNICIAN
-        // ==========================================
+        // ==================================================
 
         const technician =
             await Technician.create({
@@ -278,9 +364,9 @@ const registerTechnician = async (req, res) => {
             });
 
 
-        // ==========================================
-        // REMOVE PASSWORD FROM RESPONSE
-        // ==========================================
+        // ==================================================
+        // REMOVE PASSWORD
+        // ==================================================
 
         const technicianResponse =
             await Technician.findById(
@@ -321,9 +407,9 @@ const registerTechnician = async (req, res) => {
 
 
 
-// ==========================================
+// ======================================================
 // LOGIN TECHNICIAN
-// ==========================================
+// ======================================================
 
 const loginTechnician = async (req, res) => {
 
@@ -379,25 +465,19 @@ const loginTechnician = async (req, res) => {
             jwt.sign(
 
                 {
-
                     id:
                         technician._id
-
                 },
 
                 process.env.JWT_SECRET,
 
                 {
-
                     expiresIn:
                         "7d"
-
                 }
 
             );
 
-
-        // Don't send password
 
         const technicianResponse =
             await Technician.findById(
@@ -440,9 +520,9 @@ const loginTechnician = async (req, res) => {
 
 
 
-// ==========================================
+// ======================================================
 // GET TECHNICIAN PROFILE
-// ==========================================
+// ======================================================
 
 const getTechnicianProfile = async (req, res) => {
 
@@ -502,6 +582,7 @@ const updateTechnicianProfile = async (req, res) => {
     try {
 
         const {
+
             name,
             phone,
             city,
@@ -511,6 +592,7 @@ const updateTechnicianProfile = async (req, res) => {
             age,
             latitude,
             longitude
+
         } = req.body;
 
 
@@ -532,9 +614,9 @@ const updateTechnicianProfile = async (req, res) => {
         }
 
 
-        // ==========================================
-        // UPDATE PROFILE INFORMATION
-        // ==========================================
+        // ==================================================
+        // UPDATE BASIC INFORMATION
+        // ==================================================
 
         technician.name =
             name;
@@ -558,9 +640,9 @@ const updateTechnicianProfile = async (req, res) => {
             age;
 
 
-        // ==========================================
-        // LOCATION HANDLING
-        // ==========================================
+        // ==================================================
+        // LOCATION
+        // ==================================================
 
         const lat =
             Number(latitude);
@@ -570,15 +652,16 @@ const updateTechnicianProfile = async (req, res) => {
 
 
         const validGPSLocation =
+
             Number.isFinite(lat) &&
             Number.isFinite(lng) &&
             lat !== 0 &&
             lng !== 0;
 
 
-        // ==========================================
+        // ==================================================
         // CASE 1: GPS LOCATION
-        // ==========================================
+        // ==================================================
 
         if (validGPSLocation) {
 
@@ -599,127 +682,20 @@ const updateTechnicianProfile = async (req, res) => {
         }
 
 
-        // ==========================================
+        // ==================================================
         // CASE 2: MANUAL ADDRESS
-        // FORWARD GEOCODING
-        // ==========================================
+        // ==================================================
 
         else {
 
-            if (
-                !address ||
-                address.trim() === ""
-            ) {
-
-                return res.status(400).json({
-
-                    message:
-                        "Please provide a service address."
-
-                });
-
-            }
-
-
             try {
 
-                const searchAddress =
-                    city && city.trim() !== ""
-                        ? `${address}, ${city}, India`
-                        : `${address}, India`;
-
-
-                const response =
-                    await axios.get(
-
-                        "https://nominatim.openstreetmap.org/search",
-
-                        {
-
-                            params: {
-
-                                q:
-                                    searchAddress,
-
-                                format:
-                                    "json",
-
-                                limit:
-                                    1,
-
-                                countrycodes:
-                                    "in"
-
-                            },
-
-                            headers: {
-
-                                "User-Agent":
-                                    "TechnicianWebApp/1.0"
-
-                            },
-
-                            timeout:
-                                10000
-
-                        }
-
+                const coordinates =
+                    await geocodeAddress(
+                        address,
+                        city
                     );
 
-
-                // ==========================================
-                // ADDRESS NOT FOUND
-                // ==========================================
-
-                if (
-                    !response.data ||
-                    response.data.length === 0
-                ) {
-
-                    return res.status(400).json({
-
-                        message:
-                            "Unable to find this address. Please enter a more complete address."
-
-                    });
-
-                }
-
-
-                const geocodedLatitude =
-                    Number(
-                        response.data[0].lat
-                    );
-
-
-                const geocodedLongitude =
-                    Number(
-                        response.data[0].lon
-                    );
-
-
-                if (
-                    !Number.isFinite(
-                        geocodedLatitude
-                    ) ||
-                    !Number.isFinite(
-                        geocodedLongitude
-                    )
-                ) {
-
-                    return res.status(400).json({
-
-                        message:
-                            "Unable to get coordinates for this address."
-
-                    });
-
-                }
-
-
-                // ==========================================
-                // SAVE FORWARD GEOCODED LOCATION
-                // ==========================================
 
                 technician.location = {
 
@@ -728,8 +704,8 @@ const updateTechnicianProfile = async (req, res) => {
 
                     coordinates: [
 
-                        geocodedLongitude,
-                        geocodedLatitude
+                        coordinates.longitude,
+                        coordinates.latitude
 
                     ]
 
@@ -737,21 +713,12 @@ const updateTechnicianProfile = async (req, res) => {
 
             }
 
-            catch (geocodeError) {
+            catch (error) {
 
-                console.log(
-
-                    "Forward Geocoding Error:",
-
-                    geocodeError.message
-
-                );
-
-
-                return res.status(500).json({
+                return res.status(400).json({
 
                     message:
-                        "Unable to convert address into location."
+                        error.message
 
                 });
 
@@ -760,17 +727,16 @@ const updateTechnicianProfile = async (req, res) => {
         }
 
 
-        // ==========================================
-        // SAVE TECHNICIAN
-        // ==========================================
+        // ==================================================
+        // SAVE
+        // ==================================================
 
         await technician.save();
 
 
-        // ==========================================
-        // RETURN UPDATED TECHNICIAN
-        // WITHOUT PASSWORD
-        // ==========================================
+        // ==================================================
+        // RETURN WITHOUT PASSWORD
+        // ==================================================
 
         const updatedTechnician =
             await Technician.findById(
@@ -793,11 +759,8 @@ const updateTechnicianProfile = async (req, res) => {
     catch (error) {
 
         console.log(
-
             "Technician Profile Update Error:",
-
             error
-
         );
 
 
@@ -823,20 +786,24 @@ const changeTechnicianPassword = async (req, res) => {
     try {
 
         const {
+
             currentPassword,
             newPassword,
             confirmPassword
+
         } = req.body;
 
 
-        // ==========================================
+        // ==================================================
         // VALIDATION
-        // ==========================================
+        // ==================================================
 
         if (
+
             !currentPassword ||
             !newPassword ||
             !confirmPassword
+
         ) {
 
             return res.status(400).json({
@@ -878,9 +845,9 @@ const changeTechnicianPassword = async (req, res) => {
         }
 
 
-        // ==========================================
+        // ==================================================
         // FIND TECHNICIAN
-        // ==========================================
+        // ==================================================
 
         const technician =
             await Technician.findById(
@@ -900,9 +867,9 @@ const changeTechnicianPassword = async (req, res) => {
         }
 
 
-        // ==========================================
+        // ==================================================
         // CHECK CURRENT PASSWORD
-        // ==========================================
+        // ==================================================
 
         const passwordMatch =
             await bcrypt.compare(
@@ -926,9 +893,9 @@ const changeTechnicianPassword = async (req, res) => {
         }
 
 
-        // ==========================================
+        // ==================================================
         // HASH NEW PASSWORD
-        // ==========================================
+        // ==================================================
 
         const hashedPassword =
             await bcrypt.hash(
@@ -959,11 +926,8 @@ const changeTechnicianPassword = async (req, res) => {
     catch (error) {
 
         console.log(
-
             "Change Technician Password Error:",
-
             error
-
         );
 
 
