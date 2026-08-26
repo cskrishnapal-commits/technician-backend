@@ -5,15 +5,17 @@ const router = express.Router();
 const {
 
     registerTechnician,
-
     loginTechnician,
-
     getTechnicianProfile,
-
-    updateTechnicianProfile
+    updateTechnicianProfile,
+    changeTechnicianPassword
 
 } = require("../controllers/technicianController");
 
+
+// ==========================================
+// REGISTER
+// ==========================================
 
 router.post(
     "/register",
@@ -21,11 +23,19 @@ router.post(
 );
 
 
+// ==========================================
+// LOGIN
+// ==========================================
+
 router.post(
     "/login",
     loginTechnician
 );
 
+
+// ==========================================
+// GET PROFILE
+// ==========================================
 
 router.get(
     "/profile/:id",
@@ -33,9 +43,23 @@ router.get(
 );
 
 
+// ==========================================
+// UPDATE PROFILE
+// ==========================================
+
 router.put(
     "/profile/:id",
     updateTechnicianProfile
+);
+
+
+// ==========================================
+// CHANGE PASSWORD
+// ==========================================
+
+router.put(
+    "/profile/:id/password",
+    changeTechnicianPassword
 );
 
 
