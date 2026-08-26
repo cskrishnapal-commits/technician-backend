@@ -163,6 +163,51 @@ const loginCustomer = async (req, res) => {
 // GET NEARBY TECHNICIANS
 // ======================================================
 
+// ======================================================
+// CALCULATE DISTANCE BETWEEN CUSTOMER AND TECHNICIAN
+// ======================================================
+
+const calculateDistance = (
+    customerLat,
+    customerLng,
+    technicianLat,
+    technicianLng
+) => {
+
+    const R = 6371; // Earth radius in KM
+
+    const dLat =
+        (technicianLat - customerLat) *
+        Math.PI / 180;
+
+    const dLng =
+        (technicianLng - customerLng) *
+        Math.PI / 180;
+
+    const a =
+        Math.sin(dLat / 2) *
+        Math.sin(dLat / 2) +
+
+        Math.cos(customerLat * Math.PI / 180) *
+        Math.cos(technicianLat * Math.PI / 180) *
+        Math.sin(dLng / 2) *
+        Math.sin(dLng / 2);
+
+    const c =
+        2 *
+        Math.atan2(
+            Math.sqrt(a),
+            Math.sqrt(1 - a)
+        );
+
+    return R * c;
+};
+
+
+// ======================================================
+// GET NEARBY TECHNICIANS
+// ======================================================
+
 const getAllTechnicians = async (req, res) => {
 
     try {
@@ -177,7 +222,7 @@ const getAllTechnicians = async (req, res) => {
 
 
         // ==================================================
-        // LOCATION REQUIRED
+        // CUSTOMER LOCATION REQUIRED
         // ==================================================
 
         if (
@@ -189,19 +234,15 @@ const getAllTechnicians = async (req, res) => {
 
             return res.status(400).json({
 
-                message:
-                    "Customer location is required"
+                message: "Customer location is required"
 
             });
 
         }
 
 
-        const userLatitude =
-            Number(latitude);
-
-        const userLongitude =
-            Number(longitude);
+        const userLatitude = Number(latitude);
+        const userLongitude = Number(longitude);
 
 
         if (
@@ -211,63 +252,27 @@ const getAllTechnicians = async (req, res) => {
 
             return res.status(400).json({
 
-                message:
-                    "Invalid location coordinates"
+                message: "Invalid location coordinates"
 
             });
 
         }
 
 
+        // ==================================================
+        // MAX SEARCH DISTANCE
+        // 20 KM
+        // ==================================================
 
-        // ======================================================
-        // CALCULATE DISTANCE BETWEEN TWO LOCATIONS
-        // Returns distance in KM
-        // ======================================================
-
-        const calculateDistance = (
-            customerLat,
-            customerLng,
-            technicianLat,
-            technicianLng
-        ) => {
-
-            const R = 6371; // Earth radius in KM
-
-            const dLat =
-                (technicianLat - customerLat) *
-                Math.PI / 180;
-
-            const dLng =
-                (technicianLng - customerLng) *
-                Math.PI / 180;
-
-            const a =
-                Math.sin(dLat / 2) *
-                Math.sin(dLat / 2) +
-
-                Math.cos(customerLat * Math.PI / 180) *
-                Math.cos(technicianLat * Math.PI / 180) *
-                Math.sin(dLng / 2) *
-                Math.sin(dLng / 2);
-
-            const c =
-                2 *
-                Math.atan2(
-                    Math.sqrt(a),
-                    Math.sqrt(1 - a)
-                );
-
-            return R * c;
-        };
+        const maxSearchDistance =
+            Number(maxDistance) || 20000;
 
 
         // ==================================================
-        // APPLIANCE → TECHNICIAN SERVICE
+        // APPLIANCE → SERVICE
         // ==================================================
 
         let serviceName = "";
-
 
         switch (appliance) {
 
@@ -302,7 +307,7 @@ const getAllTechnicians = async (req, res) => {
 
 
         // ==================================================
-        // NEARBY TECHNICIAN QUERY
+        // FIND NEARBY TECHNICIANS
         // ==================================================
 
         const query = {
@@ -316,15 +321,13 @@ const getAllTechnicians = async (req, res) => {
                         type: "Point",
 
                         coordinates: [
-
                             userLongitude,
                             userLatitude
-
                         ]
 
                     },
 
-                    $maxDistance: distance
+                    $maxDistance: maxSearchDistance
 
                 }
 
@@ -333,7 +336,6 @@ const getAllTechnicians = async (req, res) => {
         };
 
 
-        // Only selected appliance/service
         if (serviceName) {
 
             query.service = serviceName;
@@ -350,59 +352,73 @@ const getAllTechnicians = async (req, res) => {
 
 
         // ==================================================
-        // PROCESS TECHNICIANS
+        // PROCESS EACH TECHNICIAN
         // ==================================================
 
-       for (const tech of technicians) {
-
-    // ==================================================
-    // CALCULATE TECHNICIAN DISTANCE
-    // ==================================================
-
-    let technicianDistance = null;
-
-    if (
-        tech.location &&
-        tech.location.coordinates &&
-        tech.location.coordinates.length === 2
-    ) {
-
-        const technicianLongitude =
-            Number(
-                tech.location.coordinates[0]
-            );
-
-        const technicianLatitude =
-            Number(
-                tech.location.coordinates[1]
-            );
-
-        if (
-            !Number.isNaN(technicianLatitude) &&
-            !Number.isNaN(technicianLongitude)
-        ) {
-
-            technicianDistance =
-                calculateDistance(
-                    userLatitude,
-                    userLongitude,
-                    technicianLatitude,
-                    technicianLongitude
-                );
-
-            // Keep only 2 decimal places
-            technicianDistance =
-                Number(
-                    technicianDistance.toFixed(2)
-                );
-
-        }
-
-    }
+        for (const tech of technicians) {
 
 
             // ==================================================
-            // GET ALL PRICES
+            // CALCULATE DISTANCE
+            // ==================================================
+
+            let technicianDistanceKm = null;
+
+
+            if (
+                tech.location &&
+                Array.isArray(
+                    tech.location.coordinates
+                ) &&
+                tech.location.coordinates.length === 2
+            ) {
+
+                const technicianLongitude =
+                    Number(
+                        tech.location.coordinates[0]
+                    );
+
+                const technicianLatitude =
+                    Number(
+                        tech.location.coordinates[1]
+                    );
+
+
+                if (
+                    !Number.isNaN(
+                        technicianLatitude
+                    ) &&
+                    !Number.isNaN(
+                        technicianLongitude
+                    )
+                ) {
+
+                    technicianDistanceKm =
+                        calculateDistance(
+
+                            userLatitude,
+
+                            userLongitude,
+
+                            technicianLatitude,
+
+                            technicianLongitude
+
+                        );
+
+
+                    technicianDistanceKm =
+                        Number(
+                            technicianDistanceKm.toFixed(2)
+                        );
+
+                }
+
+            }
+
+
+            // ==================================================
+            // GET TECHNICIAN PRICES
             // ==================================================
 
             const servicePrices =
@@ -414,7 +430,7 @@ const getAllTechnicians = async (req, res) => {
 
 
             // ==================================================
-            // PROBLEM SELECTED
+            // IF PROBLEM SELECTED
             // ==================================================
 
             if (
@@ -433,8 +449,9 @@ const getAllTechnicians = async (req, res) => {
                     );
 
 
-                // Technician has not set
+                // Technician doesn't have
                 // price for selected problem
+
                 if (!matchingPrice) {
 
                     continue;
@@ -465,19 +482,18 @@ const getAllTechnicians = async (req, res) => {
                     address:
                         tech.address,
 
-                    // Selected problem price
                     price:
                         matchingPrice.price,
 
-                    // Keep price list available
-                    // for profile
                     servicePrices:
                         servicePrices,
 
                     location:
                         tech.location,
+
+                    // IMPORTANT
                     distance:
-                            technicianDistance
+                        technicianDistanceKm
 
                 });
 
@@ -515,15 +531,15 @@ const getAllTechnicians = async (req, res) => {
 
                     price: null,
 
-                    // All technician prices
                     servicePrices:
                         servicePrices,
 
                     location:
                         tech.location,
-                    distance:
-                        technicianDistance
 
+                    // IMPORTANT
+                    distance:
+                        technicianDistanceKm
 
                 });
 
@@ -546,7 +562,6 @@ const getAllTechnicians = async (req, res) => {
 
     }
 
-
     catch (error) {
 
         console.log(
@@ -554,11 +569,9 @@ const getAllTechnicians = async (req, res) => {
             error
         );
 
-
         res.status(500).json({
 
-            message:
-                error.message
+            message: error.message
 
         });
 
