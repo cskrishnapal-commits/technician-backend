@@ -23,8 +23,31 @@ const customerSchema = new mongoose.Schema({
     profileImage: {
         type: String,
         default: ""
+    },
+
+    // Customer current location
+    location: {
+
+        type: {
+            type: String,
+            enum: ["Point"],
+            default: "Point"
+        },
+
+        coordinates: {
+            type: [Number],
+            default: [0, 0]
+        }
+
     }
 
 });
 
-module.exports = mongoose.model("Customer", customerSchema);
+customerSchema.index({
+    location: "2dsphere"
+});
+
+module.exports = mongoose.model(
+    "Customer",
+    customerSchema
+);
