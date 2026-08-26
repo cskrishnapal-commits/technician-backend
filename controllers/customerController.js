@@ -176,13 +176,15 @@ const getAllTechnicians = async (req, res) => {
         } = req.query;
 
 
-        // ------------------------------------------------
+        // ==================================================
         // LOCATION REQUIRED
-        // ------------------------------------------------
+        // ==================================================
 
         if (
-            !latitude ||
-            !longitude
+            latitude === undefined ||
+            longitude === undefined ||
+            latitude === "" ||
+            longitude === ""
         ) {
 
             return res.status(400).json({
@@ -197,7 +199,6 @@ const getAllTechnicians = async (req, res) => {
 
         const userLatitude =
             Number(latitude);
-
 
         const userLongitude =
             Number(longitude);
@@ -218,18 +219,18 @@ const getAllTechnicians = async (req, res) => {
         }
 
 
-        // ------------------------------------------------
+        // ==================================================
         // DEFAULT SEARCH DISTANCE
         // 20 KM
-        // ------------------------------------------------
+        // ==================================================
 
         const distance =
             Number(maxDistance) || 20000;
 
 
-        // ------------------------------------------------
-        // APPLIANCE -> TECHNICIAN SERVICE
-        // ------------------------------------------------
+        // ==================================================
+        // APPLIANCE → TECHNICIAN SERVICE
+        // ==================================================
 
         let serviceName = "";
 
@@ -237,62 +238,38 @@ const getAllTechnicians = async (req, res) => {
         switch (appliance) {
 
             case "AC":
-
                 serviceName = "AC Repair";
-
                 break;
-
 
             case "Refrigerator":
-
-                serviceName =
-                    "Refrigerator Repair";
-
+                serviceName = "Refrigerator Repair";
                 break;
-
 
             case "Washing Machine":
-
-                serviceName =
-                    "Washing Machine Repair";
-
+                serviceName = "Washing Machine Repair";
                 break;
-
 
             case "Cooler":
-
-                serviceName =
-                    "Cooler Repair";
-
+                serviceName = "Cooler Repair";
                 break;
-
 
             case "TV Repair":
-
-                serviceName =
-                    "TV Repair";
-
+                serviceName = "TV Repair";
                 break;
-
 
             case "Electrician":
-
-                serviceName =
-                    "Electrician";
-
+                serviceName = "Electrician";
                 break;
 
-
             default:
-
                 serviceName = appliance;
 
         }
 
 
-        // ------------------------------------------------
-        // BASE QUERY
-        // ------------------------------------------------
+        // ==================================================
+        // NEARBY TECHNICIAN QUERY
+        // ==================================================
 
         const query = {
 
@@ -322,11 +299,7 @@ const getAllTechnicians = async (req, res) => {
         };
 
 
-        // ------------------------------------------------
-        // IF APPLIANCE SELECTED
-        // ONLY THAT SERVICE TECHNICIANS
-        // ------------------------------------------------
-
+        // Only selected appliance/service
         if (serviceName) {
 
             query.service = serviceName;
@@ -336,7 +309,6 @@ const getAllTechnicians = async (req, res) => {
 
         const technicians =
             await Technician.find(query)
-
                 .select("-password -__v");
 
 
@@ -344,40 +316,44 @@ const getAllTechnicians = async (req, res) => {
 
 
         // ==================================================
-        // PROCESS EACH TECHNICIAN
+        // PROCESS TECHNICIANS
         // ==================================================
 
         for (const tech of technicians) {
 
 
-            // ------------------------------------------------
-            // IF PROBLEM IS SELECTED
-            // ------------------------------------------------
+            // Get ALL prices of this technician
+            const servicePrices =
+                await ServicePrice.find({
+
+                    technicianId: tech._id
+
+                });
+
+
+            // ==================================================
+            // PROBLEM SELECTED
+            // ==================================================
 
             if (
                 problem &&
                 problem.trim() !== ""
             ) {
 
-                const servicePrice =
-                    await ServicePrice.findOne({
+                const matchingPrice =
+                    servicePrices.find(
 
-                        technicianId: tech._id,
+                        (item) =>
 
-                        appliance: appliance,
+                            item.appliance === appliance &&
+                            item.problem === problem
 
-                        problem: problem
-
-                    });
+                    );
 
 
-                // --------------------------------------------
-                // IMPORTANT
-                // If technician has NOT added price
-                // for this problem, don't display them.
-                // --------------------------------------------
-
-                if (!servicePrice) {
+                // Technician has not set
+                // price for selected problem
+                if (!matchingPrice) {
 
                     continue;
 
@@ -407,8 +383,14 @@ const getAllTechnicians = async (req, res) => {
                     address:
                         tech.address,
 
+                    // Selected problem price
                     price:
-                        servicePrice.price,
+                        matchingPrice.price,
+
+                    // Keep price list available
+                    // for profile
+                    servicePrices:
+                        servicePrices,
 
                     location:
                         tech.location
@@ -418,21 +400,11 @@ const getAllTechnicians = async (req, res) => {
             }
 
 
-            // ------------------------------------------------
-            // IF NO PROBLEM SELECTED
-            // SHOW ALL NEARBY TECHNICIANS
-            // ------------------------------------------------
+            // ==================================================
+            // NO PROBLEM SELECTED
+            // ==================================================
 
             else {
-
-                const servicePrices =
-                    await ServicePrice.find({
-
-                        technicianId:
-                            tech._id
-
-                    });
-
 
                 result.push({
 
@@ -459,6 +431,7 @@ const getAllTechnicians = async (req, res) => {
 
                     price: null,
 
+                    // All technician prices
                     servicePrices:
                         servicePrices,
 
@@ -486,6 +459,7 @@ const getAllTechnicians = async (req, res) => {
 
     }
 
+
     catch (error) {
 
         console.log(
@@ -504,7 +478,6 @@ const getAllTechnicians = async (req, res) => {
     }
 
 };
-
 
 // ======================================================
 // GET CUSTOMER PROFILE
