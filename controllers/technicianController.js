@@ -276,9 +276,9 @@ const getTechnicianProfile = async (req, res) => {
 };
 
 
-// ==========================================
+// ======================================================
 // UPDATE TECHNICIAN PROFILE
-// ==========================================
+// ======================================================
 
 const updateTechnicianProfile = async (req, res) => {
 
@@ -297,75 +297,11 @@ const updateTechnicianProfile = async (req, res) => {
         } = req.body;
 
 
-        // Check location
-        if (
-            latitude === undefined ||
-            longitude === undefined ||
-            isNaN(Number(latitude)) ||
-            isNaN(Number(longitude))
-        ) {
-
-            return res.status(400).json({
-
-                message:
-                    "Please provide a valid location"
-
-            });
-
-        }
+        const technician =
+            await Technician.findById(req.params.id);
 
 
-        const updatedTechnician =
-            await Technician.findByIdAndUpdate(
-
-                req.params.id,
-
-                {
-
-                    name,
-
-                    phone,
-
-                    city,
-
-                    experience,
-
-                    service,
-
-                    address,
-
-                    age,
-
-
-                    // Save updated location
-                    location: {
-
-                        type: "Point",
-
-                        coordinates: [
-
-                            Number(longitude),
-
-                            Number(latitude)
-
-                        ]
-
-                    }
-
-                },
-
-                {
-
-                    new: true,
-
-                    runValidators: true
-
-                }
-
-            ).select("-password");
-
-
-        if (!updatedTechnician) {
+        if (!technician) {
 
             return res.status(404).json({
 
@@ -375,6 +311,73 @@ const updateTechnicianProfile = async (req, res) => {
             });
 
         }
+
+
+        // ==================================================
+        // UPDATE PROFILE INFORMATION
+        // ==================================================
+
+        technician.name =
+            name;
+
+        technician.phone =
+            phone;
+
+        technician.city =
+            city;
+
+        technician.experience =
+            experience;
+
+        technician.service =
+            service;
+
+        technician.address =
+            address;
+
+        technician.age =
+            age;
+
+
+        // ==================================================
+        // SAVE TECHNICIAN LOCATION
+        // MongoDB GeoJSON format:
+        // [longitude, latitude]
+        // ==================================================
+
+        if (
+            latitude !== undefined &&
+            longitude !== undefined &&
+            !Number.isNaN(Number(latitude)) &&
+            !Number.isNaN(Number(longitude))
+        ) {
+
+            technician.location = {
+
+                type: "Point",
+
+                coordinates: [
+
+                    Number(longitude),
+
+                    Number(latitude)
+
+                ]
+
+            };
+
+        }
+
+
+        await technician.save();
+
+
+        // Get updated technician without password
+
+        const updatedTechnician =
+            await Technician.findById(
+                technician._id
+            ).select("-password");
 
 
         res.status(200).json({
@@ -391,7 +394,11 @@ const updateTechnicianProfile = async (req, res) => {
 
     catch (error) {
 
-        console.log(error);
+        console.log(
+            "Technician Profile Update Error:",
+            error
+        );
+
 
         res.status(500).json({
 
