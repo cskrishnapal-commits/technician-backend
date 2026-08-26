@@ -5,6 +5,28 @@ const axios = require("axios");
 
 
 // ======================================================
+// HELPER: EXTRACT INDIAN PIN CODE FROM ADDRESS
+// ======================================================
+
+const extractPincode = (address) => {
+
+    if (!address) {
+        return null;
+    }
+
+    // Indian PIN code = 6 digits
+    // First digit cannot be 0
+    const match =
+        address.match(/\b[1-9][0-9]{5}\b/);
+
+    return match
+        ? match[0]
+        : null;
+
+};
+
+
+// ======================================================
 // HELPER: FORWARD GEOCODING
 // ADDRESS -> LATITUDE / LONGITUDE
 // ======================================================
@@ -27,8 +49,167 @@ const geocodeAddress = async (address, city) => {
         city?.trim() || "";
 
 
-    // Multiple search formats
-    // First one succeeds -> return coordinates
+    // ==================================================
+    // EXTRACT PIN CODE
+    // ==================================================
+
+    const pincode =
+        extractPincode(cleanAddress);
+
+
+    console.log(
+        "Address:",
+        cleanAddress
+    );
+
+    console.log(
+        "Extracted PIN:",
+        pincode
+    );
+
+
+    // ==================================================
+    // STEP 1: SEARCH USING PIN CODE
+    // ==================================================
+
+    if (pincode) {
+
+        const pincodeQueries = [
+
+            // PIN + City
+            cleanCity
+                ? `${pincode}, ${cleanCity}, Maharashtra, India`
+                : `${pincode}, Maharashtra, India`,
+
+            // PIN only
+            `${pincode}, India`
+
+        ];
+
+
+        for (
+            const searchAddress
+            of pincodeQueries
+        ) {
+
+            try {
+
+                console.log(
+                    "PIN Geocoding:",
+                    searchAddress
+                );
+
+
+                const response =
+                    await axios.get(
+
+                        "https://nominatim.openstreetmap.org/search",
+
+                        {
+
+                            params: {
+
+                                q:
+                                    searchAddress,
+
+                                format:
+                                    "jsonv2",
+
+                                addressdetails:
+                                    1,
+
+                                limit:
+                                    5,
+
+                                countrycodes:
+                                    "in"
+
+                            },
+
+                            headers: {
+
+                                "User-Agent":
+                                    "TechnicianWebApp/1.0"
+
+                            },
+
+                            timeout:
+                                10000
+
+                        }
+
+                    );
+
+
+                if (
+                    response.data &&
+                    response.data.length > 0
+                ) {
+
+                    for (
+                        const result
+                        of response.data
+                    ) {
+
+                        const latitude =
+                            Number(result.lat);
+
+                        const longitude =
+                            Number(result.lon);
+
+
+                        if (
+
+                            Number.isFinite(
+                                latitude
+                            ) &&
+
+                            Number.isFinite(
+                                longitude
+                            )
+
+                        ) {
+
+                            console.log(
+                                "PIN location found:",
+                                latitude,
+                                longitude
+                            );
+
+
+                            return {
+
+                                latitude,
+
+                                longitude
+
+                            };
+
+                        }
+
+                    }
+
+                }
+
+            }
+
+            catch (error) {
+
+                console.log(
+                    "PIN geocoding failed:",
+                    error.message
+                );
+
+            }
+
+        }
+
+    }
+
+
+    // ==================================================
+    // STEP 2: FULL ADDRESS SEARCH
+    // ==================================================
 
     const searchQueries = [
 
@@ -45,12 +226,15 @@ const geocodeAddress = async (address, city) => {
     ];
 
 
-    for (const searchAddress of searchQueries) {
+    for (
+        const searchAddress
+        of searchQueries
+    ) {
 
         try {
 
             console.log(
-                "Geocoding:",
+                "Full Address Geocoding:",
                 searchAddress
             );
 
@@ -125,6 +309,13 @@ const geocodeAddress = async (address, city) => {
 
                     ) {
 
+                        console.log(
+                            "Full address location found:",
+                            latitude,
+                            longitude
+                        );
+
+
                         return {
 
                             latitude,
@@ -144,7 +335,7 @@ const geocodeAddress = async (address, city) => {
         catch (error) {
 
             console.log(
-                "Geocoding attempt failed:",
+                "Full address geocoding failed:",
                 error.message
             );
 
@@ -153,14 +344,21 @@ const geocodeAddress = async (address, city) => {
     }
 
 
+    // ==================================================
+    // NOTHING FOUND
+    // ==================================================
+
     throw new Error(
 
-        "Address location could not be found. Please enter a more complete address."
+        pincode
+
+            ? `Unable to find location for PIN code ${pincode}. Please check the PIN code.`
+            
+            : "Address location could not be found. Please enter a valid address with a 6-digit PIN code."
 
     );
 
 };
-
 
 
 // ======================================================
@@ -270,7 +468,7 @@ const registerTechnician = async (req, res) => {
 
 
         // ==================================================
-        // GPS LOCATION
+        // CASE 1: GPS LOCATION
         // ==================================================
 
         if (validGPSLocation) {
@@ -285,7 +483,7 @@ const registerTechnician = async (req, res) => {
 
 
         // ==================================================
-        // MANUAL ADDRESS
+        // CASE 2: MANUAL ADDRESS
         // ==================================================
 
         else {
@@ -406,7 +604,6 @@ const registerTechnician = async (req, res) => {
 };
 
 
-
 // ======================================================
 // LOGIN TECHNICIAN
 // ======================================================
@@ -465,15 +662,19 @@ const loginTechnician = async (req, res) => {
             jwt.sign(
 
                 {
+
                     id:
                         technician._id
+
                 },
 
                 process.env.JWT_SECRET,
 
                 {
+
                     expiresIn:
                         "7d"
+
                 }
 
             );
@@ -517,7 +718,6 @@ const loginTechnician = async (req, res) => {
     }
 
 };
-
 
 
 // ======================================================
@@ -570,7 +770,6 @@ const getTechnicianProfile = async (req, res) => {
     }
 
 };
-
 
 
 // ======================================================
@@ -665,6 +864,13 @@ const updateTechnicianProfile = async (req, res) => {
 
         if (validGPSLocation) {
 
+            console.log(
+                "Using GPS coordinates:",
+                lat,
+                lng
+            );
+
+
             technician.location = {
 
                 type:
@@ -690,6 +896,11 @@ const updateTechnicianProfile = async (req, res) => {
 
             try {
 
+                console.log(
+                    "Manual address detected."
+                );
+
+
                 const coordinates =
                     await geocodeAddress(
                         address,
@@ -705,11 +916,18 @@ const updateTechnicianProfile = async (req, res) => {
                     coordinates: [
 
                         coordinates.longitude,
+
                         coordinates.latitude
 
                     ]
 
                 };
+
+
+                console.log(
+                    "Manual address coordinates:",
+                    coordinates
+                );
 
             }
 
@@ -735,7 +953,7 @@ const updateTechnicianProfile = async (req, res) => {
 
 
         // ==================================================
-        // RETURN WITHOUT PASSWORD
+        // RETURN UPDATED TECHNICIAN
         // ==================================================
 
         const updatedTechnician =
@@ -759,8 +977,11 @@ const updateTechnicianProfile = async (req, res) => {
     catch (error) {
 
         console.log(
+
             "Technician Profile Update Error:",
+
             error
+
         );
 
 
@@ -774,7 +995,6 @@ const updateTechnicianProfile = async (req, res) => {
     }
 
 };
-
 
 
 // ======================================================
@@ -868,6 +1088,22 @@ const changeTechnicianPassword = async (req, res) => {
 
 
         // ==================================================
+        // CHECK PASSWORD EXISTS
+        // ==================================================
+
+        if (!technician.password) {
+
+            return res.status(500).json({
+
+                message:
+                    "Technician password is not available."
+
+            });
+
+        }
+
+
+        // ==================================================
         // CHECK CURRENT PASSWORD
         // ==================================================
 
@@ -926,8 +1162,11 @@ const changeTechnicianPassword = async (req, res) => {
     catch (error) {
 
         console.log(
+
             "Change Technician Password Error:",
+
             error
+
         );
 
 
@@ -941,7 +1180,6 @@ const changeTechnicianPassword = async (req, res) => {
     }
 
 };
-
 
 
 // ======================================================
