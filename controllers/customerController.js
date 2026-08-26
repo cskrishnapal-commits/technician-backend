@@ -219,13 +219,47 @@ const getAllTechnicians = async (req, res) => {
         }
 
 
-        // ==================================================
-        // DEFAULT SEARCH DISTANCE
-        // 20 KM
-        // ==================================================
 
-        const distance =
-            Number(maxDistance) || 20000;
+        // ======================================================
+        // CALCULATE DISTANCE BETWEEN TWO LOCATIONS
+        // Returns distance in KM
+        // ======================================================
+
+        const calculateDistance = (
+            customerLat,
+            customerLng,
+            technicianLat,
+            technicianLng
+        ) => {
+
+            const R = 6371; // Earth radius in KM
+
+            const dLat =
+                (technicianLat - customerLat) *
+                Math.PI / 180;
+
+            const dLng =
+                (technicianLng - customerLng) *
+                Math.PI / 180;
+
+            const a =
+                Math.sin(dLat / 2) *
+                Math.sin(dLat / 2) +
+
+                Math.cos(customerLat * Math.PI / 180) *
+                Math.cos(technicianLat * Math.PI / 180) *
+                Math.sin(dLng / 2) *
+                Math.sin(dLng / 2);
+
+            const c =
+                2 *
+                Math.atan2(
+                    Math.sqrt(a),
+                    Math.sqrt(1 - a)
+                );
+
+            return R * c;
+        };
 
 
         // ==================================================
@@ -319,10 +353,58 @@ const getAllTechnicians = async (req, res) => {
         // PROCESS TECHNICIANS
         // ==================================================
 
-        for (const tech of technicians) {
+       for (const tech of technicians) {
+
+    // ==================================================
+    // CALCULATE TECHNICIAN DISTANCE
+    // ==================================================
+
+    let technicianDistance = null;
+
+    if (
+        tech.location &&
+        tech.location.coordinates &&
+        tech.location.coordinates.length === 2
+    ) {
+
+        const technicianLongitude =
+            Number(
+                tech.location.coordinates[0]
+            );
+
+        const technicianLatitude =
+            Number(
+                tech.location.coordinates[1]
+            );
+
+        if (
+            !Number.isNaN(technicianLatitude) &&
+            !Number.isNaN(technicianLongitude)
+        ) {
+
+            technicianDistance =
+                calculateDistance(
+                    userLatitude,
+                    userLongitude,
+                    technicianLatitude,
+                    technicianLongitude
+                );
+
+            // Keep only 2 decimal places
+            technicianDistance =
+                Number(
+                    technicianDistance.toFixed(2)
+                );
+
+        }
+
+    }
 
 
-            // Get ALL prices of this technician
+            // ==================================================
+            // GET ALL PRICES
+            // ==================================================
+
             const servicePrices =
                 await ServicePrice.find({
 
@@ -393,7 +475,9 @@ const getAllTechnicians = async (req, res) => {
                         servicePrices,
 
                     location:
-                        tech.location
+                        tech.location,
+                    distance:
+                            technicianDistance
 
                 });
 
@@ -436,7 +520,10 @@ const getAllTechnicians = async (req, res) => {
                         servicePrices,
 
                     location:
-                        tech.location
+                        tech.location,
+                    distance:
+                        technicianDistance
+
 
                 });
 
